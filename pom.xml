@@ -424,6 +424,7 @@
   <modules>
     <module>analytics</module>
     <module>csv</module>
+    <module>geonode</module>
     <module>importer</module>
     <module>printng</module>
     <module>web</module>
