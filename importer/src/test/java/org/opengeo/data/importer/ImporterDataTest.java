@@ -644,4 +644,22 @@ public class ImporterDataTest extends ImporterTestSupport {
         assertTrue(task.getData() instanceof SpatialFile);
         assertEquals("GeoTIFF", task.getData().getFormat().getName());
     }
+
+    public void testImportShapefileWithSpaces() throws Exception {
+        Catalog cat = getCatalog();
+
+        DataStoreInfo ds = createH2DataStore(cat.getDefaultWorkspace().getName(), "spearfish");
+
+        File f = new File(unpack("shape/bugsites_with_space.zip"), "bug sites.shp");
+        ImportContext imprt = importer.createContext(new SpatialFile(f), ds);
+        assertEquals(1, imprt.getTasks().size());
+
+        ImportTask task = imprt.getTasks().get(0);
+        assertEquals(ImportTask.State.READY, task.getState());
+
+        importer.run(imprt);
+
+        assertEquals(ImportTask.State.COMPLETE, task.getState());
+        assertEquals("bug_sites", task.getLayer().getName());
+    }
 }
