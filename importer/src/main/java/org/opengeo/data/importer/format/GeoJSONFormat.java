@@ -34,25 +34,15 @@ import org.opengis.feature.simple.SimpleFeatureType;
 import org.opengis.feature.type.FeatureType;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
 
-import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
-import com.google.common.collect.Collections2;
 import com.google.common.collect.Iterables;
 
 public class GeoJSONFormat extends VectorFormat {
 
     static Logger LOG = Logging.getLogger(GeoJSONFormat.class);
 
-    static CoordinateReferenceSystem GEOJSON_CRS;
-    static {
-        try {
-            GEOJSON_CRS = CRS.decode("EPSG:4326");
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
     @Override
     public FeatureReader read(ImportData data, ImportItem item) throws IOException {
         final FeatureType featureType = 
@@ -101,7 +91,7 @@ public class GeoJSONFormat extends VectorFormat {
     
     @Override
     public boolean canRead(ImportData data) throws IOException {
-        Optional<File> file = file(data);
+        Optional<File> file = maybeFile(data);
         if (file.isPresent()) {
             return sniff(file.get()) != null;
         }
@@ -150,7 +140,7 @@ public class GeoJSONFormat extends VectorFormat {
     }
 
     ImportItem item(ImportData data, Catalog catalog) throws IOException {
-        File file = file(data).get();
+        File file = maybeFile(data).get();
         
         // grab first feature to check its crs
         SimpleFeature first = sniff(file);
@@ -170,10 +160,17 @@ public class GeoJSONFormat extends VectorFormat {
         ft.setNativeName(ft.getName());
 
         // crs
-        CoordinateReferenceSystem crs = GEOJSON_CRS;
+        CoordinateReferenceSystem crs = null;
         if (featureType != null && featureType.getCoordinateReferenceSystem() != null) {
             crs = featureType.getCoordinateReferenceSystem();
         }
+        try {
+            crs = crs != null ? crs : CRS.decode("EPSG:4326");
+        } 
+        catch (Exception e) {
+            throw new IOException(e);
+        }
+
         ft.setNativeCRS(crs);
 
         String srs = srs(crs);
@@ -211,10 +208,11 @@ public class GeoJSONFormat extends VectorFormat {
             }).getFile();
         }
         else {
-            return file(data).get();
+            return maybeFile(data).get();
         }
     }
-    Optional<File> file(ImportData data) {
+
+    Optional<File> maybeFile(ImportData data) {
         if (data instanceof FileData) {
             return Optional.of(((FileData) data).getFile());
         }
