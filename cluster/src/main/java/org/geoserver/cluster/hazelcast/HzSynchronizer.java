@@ -13,6 +13,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.geoserver.GeoServerConfigurationLock;
 import org.geoserver.catalog.CatalogException;
 import org.geoserver.catalog.Info;
 import org.geoserver.catalog.StoreInfo;
@@ -72,14 +73,17 @@ public abstract class HzSynchronizer extends GeoServerSynchronizer implements
 
     private volatile boolean started;
 
+    protected final GeoServerConfigurationLock configLock;
+    
     ScheduledExecutorService getNewExecutor() {
         return Executors.newSingleThreadScheduledExecutor(new ThreadFactoryBuilder().setNameFormat(
                 "HzSynchronizer-%d").build());
     }
 
-    public HzSynchronizer(HzCluster cluster, GeoServer gs) {
+    public HzSynchronizer(HzCluster cluster, GeoServer gs,GeoServerConfigurationLock configLock) {
         this.cluster = cluster;
         this.gs = gs;
+        this.configLock = configLock;
 
         topic = cluster.getHz().getTopic("geoserver.config");
         topic.addMessageListener(this);

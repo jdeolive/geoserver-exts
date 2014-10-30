@@ -7,6 +7,8 @@ import java.util.Queue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 
+import org.geoserver.GeoServerConfigurationLock;
+import org.geoserver.GeoServerConfigurationLock.LockType;
 import org.geoserver.cluster.Event;
 import org.geoserver.config.GeoServer;
 
@@ -25,20 +27,22 @@ public class ReloadHzSynchronizer extends HzSynchronizer {
     /** lock during reload */
     protected AtomicBoolean eventLock = new AtomicBoolean();
 
-    public ReloadHzSynchronizer(HzCluster cluster, GeoServer gs) {
-        super(cluster, gs);
+    public ReloadHzSynchronizer(HzCluster cluster, GeoServer gs, GeoServerConfigurationLock geoServerConfigurationLock) {
+        super(cluster, gs,geoServerConfigurationLock);
     }
 
     @Override
     protected void processEventQueue(Queue<Event> q) throws Exception {
         // lock during event processing
         eventLock.set(true);
+        configLock.lock(LockType.WRITE);
         try {
             gs.reload();
         } catch (Exception e) {
             LOGGER.log(Level.WARNING, "Reload failed", e);
         } finally {
             q.clear();
+            configLock.unlock(LockType.WRITE);
             eventLock.set(false);
         }
     }

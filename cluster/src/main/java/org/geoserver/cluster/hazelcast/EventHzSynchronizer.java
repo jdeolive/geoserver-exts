@@ -13,6 +13,8 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 
+import org.geoserver.GeoServerConfigurationLock;
+import org.geoserver.GeoServerConfigurationLock.LockType;
 import org.geoserver.catalog.Catalog;
 import org.geoserver.catalog.CatalogInfo;
 import org.geoserver.catalog.Info;
@@ -63,8 +65,8 @@ public class EventHzSynchronizer extends HzSynchronizer {
 
     private final AckListener ackListener;
 
-    public EventHzSynchronizer(HzCluster cluster, GeoServer gs) {
-        super(cluster, gs);
+    public EventHzSynchronizer(HzCluster cluster, GeoServer gs, GeoServerConfigurationLock configLock) {
+        super(cluster, gs, configLock);
 
         ackTopic = cluster.getHz().getTopic("geoserver.config.ack");
         ackTopic.addMessageListener(ackListener = new AckListener());
@@ -143,27 +145,35 @@ public class EventHzSynchronizer extends HzSynchronizer {
 
     @Override
     protected void processEventQueue(Queue<Event> q) throws Exception {
+
+        configLock.lock(LockType.WRITE);
         Iterator<Event> it = q.iterator();
-        while (it.hasNext() && isStarted()) {
-            final Event event = it.next();
-            try {
-                it.remove();
-                LOGGER.fine(format("%s - Processing event %s", nodeId(), event));
-                if (!(event instanceof ConfigChangeEvent)) {
-                    return;
+        try {
+            while (it.hasNext() && isStarted()) {
+                final Event event = it.next();
+                try {
+                    it.remove();
+                    LOGGER.fine(format("%s - Processing event %s", nodeId(), event));
+                    if (!(event instanceof ConfigChangeEvent)) {
+                        return;
+                    }
+                    ConfigChangeEvent ce = (ConfigChangeEvent) event;
+                    Class<? extends Info> clazz = ce.getObjectInterface();
+                    if (CatalogInfo.class.isAssignableFrom(clazz)) {
+                        processCatalogEvent(ce);
+                    } else {
+                        processGeoServerConfigEvent(ce);
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                } finally {
+                    ack(event);
                 }
-                ConfigChangeEvent ce = (ConfigChangeEvent) event;
-                Class<? extends Info> clazz = ce.getObjectInterface();
-                if (CatalogInfo.class.isAssignableFrom(clazz)) {
-                    processCatalogEvent(ce);
-                } else {
-                    processGeoServerConfigEvent(ce);
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
-            } finally {
-                ack(event);
             }
+        }
+        finally {
+            q.clear();
+            configLock.unlock(LockType.WRITE);
         }
     }
 
