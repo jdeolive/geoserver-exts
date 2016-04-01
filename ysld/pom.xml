@@ -19,7 +19,6 @@
   </description>
 
   <modules>
-    <module>gt-ysld</module>
     <module>gs-ysld</module>
   </modules>
 
